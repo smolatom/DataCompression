@@ -1,19 +1,14 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DataCompression.Huffman
 {
-    class Tree
+    internal class Tree
     {
-        public Node Root { get; set; }
+        protected internal Node Root { get; set; }
 
-        public Tree()
+        protected internal Tree()
         {
             NYT = createNYT(null, MAXIMAL_INDEX);
             Root = NYT;
@@ -29,14 +24,9 @@ namespace DataCompression.Huffman
         private readonly Dictionary<uint, List<Node>> occurenceBlocks;
         private Node NYT;
 
-        public bool Contains(byte charAsciCode)
+        protected internal bool[] Add(byte asciiCode)
         {
-            return nodesInTree.ContainsKey(charAsciCode);
-        }
-
-        public bool[] Add(byte asciiCode)
-        {
-            if (Contains(asciiCode))
+            if (contains(asciiCode))
             {
                 var existingChar = nodesInTree[asciiCode];
                 var code = getCode(existingChar).ToArray();
@@ -47,15 +37,7 @@ namespace DataCompression.Huffman
             {
                 var code = NYT == Root ? getAsciCode(asciiCode) : getNYTCode().Concat(getAsciCode(asciiCode));
 
-                var newChar = new Node(NYT, --actualIndex, asciiCode);
-                nodesInTree.Add(newChar.Value, newChar);
-                addNewNodeToBlock(newChar);
-                NYT.RightChild = newChar;
-                occurenceBlocks[NYT.Occurences].Remove(NYT);
-                NYT.Occurences++;
-                addNewNodeToBlock(NYT);
-                NYT.LeftChild = createNYT(NYT, --actualIndex);
-                NYT = NYT.LeftChild;
+                addNewCharToTree(asciiCode);
                 var processedChar = NYT.Parent;
                 if (processedChar == Root) //konec, vrátit pouze zakódované ascii
                     return code.ToArray();
@@ -64,7 +46,25 @@ namespace DataCompression.Huffman
             }
         }
 
-        private bool[] getAsciCode(byte asciiCode)
+        private bool contains(byte charAsciCode)
+        {
+            return nodesInTree.ContainsKey(charAsciCode);
+        }
+
+        private void addNewCharToTree(byte asciiCode)
+        {
+            var newChar = new Node(NYT, --actualIndex, asciiCode);
+            nodesInTree.Add(newChar.Value, newChar);
+            addNewNodeToBlock(newChar);
+            NYT.RightChild = newChar;
+            occurenceBlocks[NYT.Occurences].Remove(NYT);
+            NYT.Occurences++;
+            addNewNodeToBlock(NYT);
+            NYT.LeftChild = createNYT(NYT, --actualIndex);
+            NYT = NYT.LeftChild;
+        }
+
+        private IEnumerable<bool> getAsciCode(byte asciiCode)
         {
             var bits = new BitArray(new[] { asciiCode });
             var code = new List<bool>();
@@ -73,20 +73,6 @@ namespace DataCompression.Huffman
                 code.Add(bits[i]);
             }
             code.Reverse();
-            return code.ToArray();
-        }
-
-        private bool[] getAsciCode(Node newNode)
-        {
-            var bits = new BitArray(new[] { newNode.Value });
-            var code = new List<bool>();
-            for (int i = 0; i < 7; i++)
-            {
-                code.Add(bits[i]);
-            }
-            code.Reverse();
-            if (nodesInTree.Count != 1)
-                code.InsertRange(0, getNYTCode());
             return code.ToArray();
         }
 

@@ -8,7 +8,9 @@ using NUnit.Framework.Constraints;
 
 namespace DataCompression.Huffman
 {
-    
+    /// <summary>
+    /// AdaptiveHuffmanCompressor implements Huffman's coding (Vitter variant).
+    /// </summary>
     [TestFixture]
     class AdaptiveHuffmanCompressor
     {
@@ -134,18 +136,23 @@ namespace DataCompression.Huffman
         })]
         public void CompressionOutputIsRight(string input, bool[] expectedValue)
         {
-            var jahoda = AdaptiveHuffmanCompressor.Compress(input);
-            Assert.IsTrue(expectedValue.SequenceEqual(jahoda), String.Join(" ", jahoda));
+            var encodedInput = Compress(input);
+            Assert.IsTrue(expectedValue.SequenceEqual(encodedInput), String.Join(" ", encodedInput));
         }
 
+        /// <summary>
+        /// Encodes input using Huffman coding (Vitter's version).
+        /// </summary>
+        /// <param name="input">String to be encoded</param>
+        /// <returns>Bool array cointaining encoded characters.</returns>
         public static bool[] Compress(string input)
         {
             var tree = new Tree();
-            var asciiCodess = Encoding.ASCII.GetBytes(input);
-            var jahoda = asciiCodess.Select(tree.Add).ToList();
-            var kiwi = new List<bool>();
-            jahoda.ForEach(x => x.ToList().ForEach(kiwi.Add));
-            return kiwi.ToArray();
+            var asciiEncodedInput = Encoding.ASCII.GetBytes(input);
+            var huffmanEncodedChars = asciiEncodedInput.Select(tree.Add).ToList();
+            var huffmanEncodedInput = new List<bool>();
+            huffmanEncodedChars.ForEach(x => x.ToList().ForEach(huffmanEncodedInput.Add));
+            return huffmanEncodedInput.ToArray();
         }
     }
 }

@@ -1,27 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace DataCompression.Huffman
+﻿namespace DataCompression.Huffman
 {
-    public class Node
+    internal class Node
     {
-        public Node LeftChild { get; set; }
-        public Node RightChild { get; set; }
+        protected internal Node LeftChild { get; set; }
+        protected internal Node RightChild { get; set; }
 
-        public Node Parent { get; set; }
-        public byte Index { get; set; }
-        public byte Value { get; set; }
-        public uint Occurences { get; set; }
+        protected internal Node Parent { get; set; }
+        protected internal byte Index { get; set; }
+        protected internal byte Value { get; set; }
+        protected internal uint Occurences { get; set; }
 
-        public Node(byte index)
+        protected internal Node(byte index)
         {
             Index = index;
         }
 
-        public Node(Node parent, byte index, byte value)
+        protected internal Node(Node parent, byte index, byte value)
         {
             Parent = parent;
             Index = index;
