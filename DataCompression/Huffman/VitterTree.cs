@@ -1,30 +1,41 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace DataCompression.Huffman
 {
-    internal class Tree
+    internal class VitterTree
     {
         protected internal Node Root { get; set; }
 
-        protected internal Tree()
+        protected internal VitterTree()
         {
             NYT = createNYT(null, MAXIMAL_INDEX);
             Root = NYT;
             actualIndex = MAXIMAL_INDEX;
             nodesInTree = new Dictionary<byte, Node>();
             occurenceBlocks = new Dictionary<uint, List<Node>>();
-            addNewNodeToBlock(Root);
+            pointer = Root;
+            firstOccurenceOfCharIsPushed = true;
+            charBuffer = new List<bool>();
         }
+
+        public delegate void CharReadEventHandler(object sender, CharReadEventArgs e);
+
+        protected internal event CharReadEventHandler CharRead;
 
         private const byte MAXIMAL_INDEX = 127;
         private byte actualIndex;
         private readonly Dictionary<byte, Node> nodesInTree;
         private readonly Dictionary<uint, List<Node>> occurenceBlocks;
         private Node NYT;
+        private Node pointer;
+        private bool firstOccurenceOfCharIsPushed;
+        private List<bool> charBuffer;
 
-        protected internal bool[] Add(byte asciiCode)
+        protected internal bool[] AddChar(byte asciiCode)
         {
             if (contains(asciiCode))
             {
@@ -46,6 +57,68 @@ namespace DataCompression.Huffman
             }
         }
 
+        protected internal void PushBit(bool bit)
+        {
+            if (firstOccurenceOfCharIsPushed)
+            {
+                if (charBuffer.Count < 7)
+                    charBuffer.Add(bit);
+                if (charBuffer.Count == 7)
+                {
+                    var charValue = convertBoolsToByte((charBuffer));
+                    OnCharRead(Encoding.ASCII.GetString(charValue));
+                    firstOccurenceOfCharIsPushed = false;
+                    charBuffer.Clear();
+                    AddChar(charValue[0]);
+                }
+            }
+            else
+            {
+                processBit(bit);
+            }
+        }
+
+        private void processBit(bool bit)
+        {
+            if (bit && pointer.RightChild != null)
+            {
+                pointer = pointer.RightChild;
+                if (pointer.IsCharacterLeaf)
+                {
+                    OnCharRead(Encoding.ASCII.GetString(new[] { pointer.Value }));
+                    AddChar(pointer.Value);
+                    pointer = Root;
+                }
+                if (pointer.IsNYT)
+                {
+                    pointer = Root;
+                    firstOccurenceOfCharIsPushed = true;
+                }
+            }
+            if (!bit && pointer.LeftChild != null)
+            {
+                pointer = pointer.LeftChild;
+                if (pointer.IsCharacterLeaf)
+                {
+                    OnCharRead(Encoding.ASCII.GetString(new[] { pointer.Value }));
+                    AddChar(pointer.Value);
+                    pointer = Root;
+                }
+                if (pointer.IsNYT)
+                {
+                    pointer = Root;
+                    firstOccurenceOfCharIsPushed = true;
+                }
+            }
+        }
+
+        protected internal void OnCharRead(string character)
+        {
+            var handler = CharRead;
+            if (handler != null)
+                handler(this, new CharReadEventArgs { Character = character });
+        }
+
         private bool contains(byte charAsciCode)
         {
             return nodesInTree.ContainsKey(charAsciCode);
@@ -57,7 +130,6 @@ namespace DataCompression.Huffman
             nodesInTree.Add(newChar.Value, newChar);
             addNewNodeToBlock(newChar);
             NYT.RightChild = newChar;
-            occurenceBlocks[NYT.Occurences].Remove(NYT);
             NYT.Occurences++;
             addNewNodeToBlock(NYT);
             NYT.LeftChild = createNYT(NYT, --actualIndex);
@@ -101,18 +173,23 @@ namespace DataCompression.Huffman
 
         private void addNewNodeToBlock(Node newNode)
         {
-            if (!occurenceBlocks.ContainsKey(newNode.Occurences))
-                occurenceBlocks.Add(newNode.Occurences, new List<Node>());
-            occurenceBlocks[newNode.Occurences].Add(newNode);
+            if (newNode != Root)
+            {
+                if (!occurenceBlocks.ContainsKey(newNode.Occurences))
+                    occurenceBlocks.Add(newNode.Occurences, new List<Node>());
+                occurenceBlocks[newNode.Occurences].Add(newNode);
+            }
         }
 
         private void updateTree(Node processedNode)
         {
             while (true)
             {
+                if (!occurenceBlocks.ContainsKey(processedNode.Occurences))
+                    break;
                 var block = occurenceBlocks[processedNode.Occurences];
-                var nodeWithMaxIndexInBlock = block.OrderByDescending(x => x.Index).First();
-                if (processedNode.Index != nodeWithMaxIndexInBlock.Index)
+                var nodeWithMaxIndexInBlock = block.OrderByDescending(x => x.Index).FirstOrDefault();
+                if (nodeWithMaxIndexInBlock != null && processedNode != Root && processedNode.Index != nodeWithMaxIndexInBlock.Index)
                     swapNodes(nodeWithMaxIndexInBlock, processedNode);
                 occurenceBlocks[processedNode.Occurences].Remove(processedNode);
                 processedNode.Occurences++;
@@ -127,7 +204,7 @@ namespace DataCompression.Huffman
             }
         }
 
-        private static void swapNodes(Node nodeWithMaxIndexInBlock, Node processedNode)
+        private void swapNodes(Node nodeWithMaxIndexInBlock, Node processedNode)
         {
             var parentOfNodeWithMaxIndexInBlock = nodeWithMaxIndexInBlock.Parent;
             var parentOfProcessedNode = processedNode.Parent;
@@ -151,5 +228,20 @@ namespace DataCompression.Huffman
         {
             return new Node(index) { Parent = parent };
         }
+
+        private byte[] convertBoolsToByte(List<bool> bits)
+        {
+            bits.Insert(0, false);
+            bits.Reverse();
+            var a = new BitArray(bits.ToArray());
+            var bytes = new byte[1];
+            a.CopyTo(bytes, 0);
+            return bytes;
+        }
+    }
+
+    internal class CharReadEventArgs
+    {
+        protected internal string Character { get; set; }
     }
 }

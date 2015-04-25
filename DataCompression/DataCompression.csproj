@@ -45,7 +45,7 @@
   <ItemGroup>
     <Compile Include="Huffman\AdaptiveHuffmanCompressor.cs" />
     <Compile Include="Huffman\Node.cs" />
-    <Compile Include="Huffman\Tree.cs" />
+    <Compile Include="Huffman\VitterTree.cs" />
     <Compile Include="Json\JsonHCompressor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
