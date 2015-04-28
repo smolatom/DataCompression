@@ -1,8 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
+using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Web.Helpers;
+using System.Xml.Linq;
+using Microsoft.SqlServer.Server;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 
 namespace DataCompression.Json
@@ -22,20 +29,12 @@ namespace DataCompression.Json
         }
 
         [Theory]
-        public void CompressionOutputIsJsonArray()
-        {
-            const string jsonString = "[{}]";
-            var jsonHString = Compress(jsonString);
-            Assert.IsInstanceOf(typeof(DynamicJsonArray), System.Web.Helpers.Json.Decode(jsonHString));
-        }
-
-        [Theory]
         [TestCase("[{}]", "[0]")]
         [TestCase("[]", "[]")]
         [TestCase(@"[{""a"":12}]", @"[1,""a"",12]")]
         [TestCase(@"[{""a"":12,""b"":13}]", @"[2,""a"",""b"",12,13]")]
         [TestCase(@"[{""a"":12,""b"":13},{""a"":14,""b"":15}]", @"[2,""a"",""b"",12,13,14,15]")]
-        [TestCase(@"[{""a"":12},{""b"":12}]", "")]
+        [TestCase(@"[{""a"":12},{""b"":12}]", "[JSON object doesn't have required pattern.]")]
         [TestCase(@"[{""a"":null},{""a"":12}]", @"[1,""a"",null,12]")]
         [TestCase(@"[{""a"":[13,14,""jahoda""], ""b"":""hi"", ""c"":true}]",
             @"[3,""a"",""b"",""c"",[13,14,""jahoda""],""hi"",true]")]
@@ -47,15 +46,18 @@ namespace DataCompression.Json
             @"[3,""a"",""b"",""c"",{""jahoda"":13,""kiwi"":{""a"":13,""b"":""hide"",""c"":false}},""hi"",true]")]
         public void CompressionOutputEqualsToJsonH(string jsonString, string jsonHString)
         {
-            Assert.AreEqual(jsonHString, Compress(jsonString));
-        }
-
-        [Theory]
-        public void DecompressionOutputIsJsonArray()
-        {
-            const string jsonH = "[]";
-            var json = Decompress(jsonH);
-            Assert.IsInstanceOf(typeof(DynamicJsonArray), System.Web.Helpers.Json.Decode(json));
+            const string jsonFile = @"C:\Users\speedy\Documents\TestFiles\CompressionTest.js";
+            using (var writer = new StreamWriter(jsonFile))
+            {
+                writer.Write(jsonString);
+            }
+            Compress(jsonFile);
+            const string jsonHFile = @"C:\Users\speedy\Documents\TestFiles\CompressionTest-jsonh.js";
+            using (var reader = new StreamReader(jsonHFile))
+            {
+                var jsonh = reader.ReadToEnd();
+                Assert.AreEqual(jsonHString, jsonh);
+            }
         }
 
         [Theory]
@@ -68,81 +70,140 @@ namespace DataCompression.Json
         [TestCase(@"[3,""a"",""b"",""c"",[13,14,""jahoda""],""hi"",true]",
             @"[{""a"":[13,14,""jahoda""],""b"":""hi"",""c"":true}]")]
         [TestCase(@"[3,""a"",""b"",""c"",{""jahoda"":13,""kiwi"":""jahoda""},""hi"",true,13,""hide"",false]",
-            @"[{""a"":{""jahoda"":13,""kiwi"":""jahoda""},""b"":""hi"",""c"":true},{""a"":13,""b"":""hide"",""c"":false}]")]
+            @"[{""a"":{""jahoda"":13,""kiwi"":""jahoda""},""b"":""hi"",""c"":true},{""a"":13,""b"":""hide"",""c"":false}]"
+            )]
         [TestCase(@"[3,""a"",""b"",""c"",{""jahoda"":13,""kiwi"":{""a"":13,""b"":""hide"",""c"":false}},""hi"",true]",
             @"[{""a"":{""jahoda"":13,""kiwi"":{""a"":13,""b"":""hide"",""c"":false}},""b"":""hi"",""c"":true}]")]
         public void DecompressionOutputEqualsToJson(string jsonH, string json)
         {
-            Assert.AreEqual(json, Decompress(jsonH));
+            const string jsonHFile = @"C:\Users\speedy\Documents\TestFiles\DecompressionTest-jsonh.js";
+            using (var writer = new StreamWriter(jsonHFile))
+            {
+                writer.Write(jsonH);
+            }
+            Decompress(jsonHFile);
+            const string jsonFile = @"C:\Users\speedy\Documents\TestFiles\DecompressionTest.js";
+            using (var reader = new StreamReader(jsonFile))
+            {
+                var decompressedJson = reader.ReadToEnd();
+                Assert.AreEqual(json, decompressedJson);
+            }
         }
 
         /// <summary>
-        /// Transforms homogeneous collection of object to JSONH array.
+        /// Transforms homogeneous collection of object to JSONH array and produces it as a file.
         /// </summary>
-        /// <param name="jsonString">JSON data as string.</param>
+        /// <param name="path">A path to the file contaiining JSON</param>
         /// <example>Transforms [{"a":12,"b":13},{"a":14,"b":15}] to [2,"a","b",12,13,14,15].</example>
         /// <returns>Data compressed as JSONH string.</returns>
-        public string Compress(string jsonString)
+        public void Compress(string path)
         {
-            var resultString = new StringBuilder("[");
-            try
+            if (File.Exists(path) && Path.GetExtension(path) == ".js")
             {
-                var json = System.Web.Helpers.Json.Decode(jsonString);
-                resultString.Append(compressDynamicJsonArray(json));
+                var resultString = new StringBuilder("[");
+                compressFile(path, resultString);
+                resultString.Append("]");
+
+                writeToJsonHFile(path, resultString);
             }
-            catch (Exception)
-            {
-                return String.Empty;
-            }
-            resultString.Append("]");
-            return resultString.ToString();
         }
 
         /// <summary>
-        /// Transforms JSONH array to homogeneous collection of object.
+        /// Transforms JSONH array to homogeneous collection of objects and produces it as a file.
         /// </summary>
-        /// <param name="jsonHString">JSONH data as string.</param>
+        /// <param name="path">A path to the file contaiining JSONH</param>
         /// <example>Transforms [2,"a","b",12,13,14,15] to [{"a":12,"b":13},{"a":14,"b":15}].</example>
         /// <returns>Data decompressed as JSON string.</returns>
-        public string Decompress(string jsonHString)
+        public void Decompress(string path)
         {
-            var resultString = new StringBuilder("[");
-            try
+            if (File.Exists(path) && Path.GetExtension(path) == ".js")
             {
-                var jsonH = System.Web.Helpers.Json.Decode(jsonHString);
-                resultString.Append(decompressDynamicJsonArray(jsonH));
+                var resultString = new StringBuilder("[");
+                decompressFile(path, resultString);
+                resultString.Append("]");
+
+                writeToJsonFile(path, resultString);
             }
-            catch (Exception ex)
+        }
+
+        private void compressFile(string path, StringBuilder resultString)
+        {
+            using (var reader = new StreamReader(path))
             {
-                return ex.Message;
+                var jsonString = reader.ReadToEnd();
+                try
+                {
+                    var json = JArray.Parse(jsonString);
+                    resultString.Append(compressDynamicJsonArray(json));
+                }
+                catch (Exception e)
+                {
+                    resultString.Append(e.Message);
+                }
             }
-            resultString.Append("]");
+        }
+
+        private static void writeToJsonHFile(string path, StringBuilder resultString)
+        {
+            var fileName = Path.GetFileName(path);
+            var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(path);
+            var newPath = path.Replace(fileName, String.Format("{0}-jsonh.js", fileNameWithoutExtension));
+            using (var writer = new StreamWriter(newPath))
+            {
+                writer.Write(resultString.ToString());
+            }
+        }
+
+        private void decompressFile(string path, StringBuilder resultString)
+        {
+
+            using (var reader = new StreamReader(path))
+            {
+                var jsonHString = reader.ReadToEnd();
+                try
+                {
+                    var jsonH = JArray.Parse(jsonHString);
+                    resultString.Append(decompressDynamicJsonArray(jsonH));
+                }
+                catch (Exception ex)
+                {
+                    resultString.Append(ex.Message);
+                } 
+            }
+        }
+
+        private void writeToJsonFile(string path, StringBuilder resultString)
+        {
+            var fileName = Path.GetFileName(path);
+            var newFileName = Path.GetFileNameWithoutExtension(path);
+            var newPath = path.Replace("-jsonh.js", ".js");
+            using (var writer = new StreamWriter(newPath))
+            {
+                writer.Write(resultString.ToString());
+            }
+        }
+
+        private string compressDynamicJsonArray(ICollection<JToken> jsonArray)
+        {
+            var resultString = new StringBuilder();
+            if (jsonArray.Count > 0)
+            {
+                var memberNames = appendMemberCountAndNamesToResult(jsonArray, resultString);
+                appendValuesToResult(jsonArray, memberNames, resultString);
+            }
             return resultString.ToString();
         }
 
-        private string compressDynamicJsonArray(dynamic json)
+        private static List<string> appendMemberCountAndNamesToResult(ICollection<JToken> jsonArray, StringBuilder resultString)
         {
-            if (json is DynamicJsonArray)
-            {
-                var resultString = new StringBuilder();
-                var jsonArray = json as DynamicJsonArray;
-                if (jsonArray.Length > 0)
-                {
-                    var memberNames = appendMemberCountAndNamesToResult(jsonArray, resultString);
-                    appendValuesToResult(json, memberNames, resultString);
-                }
-                return resultString.ToString();
-            }
-            throw new ArgumentException("JSON is not array.");
-        }
-
-        private static List<string> appendMemberCountAndNamesToResult(IEnumerable<object> jsonArray, StringBuilder resultString)
-        {
-            List<string> memberNames;
+            var memberNames = new List<string>();
             var first = jsonArray.First();
-            if (first is DynamicJsonObject)
+            var o = first as JObject;
+            if (o != null)
             {
-                memberNames = (first as DynamicJsonObject).GetDynamicMemberNames().ToList();
+                var a = o;
+                JEnumerable<JToken> members = first.Children();
+                memberNames.AddRange(members.ToList().Select(x => ((JProperty)x).Name).ToList());
                 resultString.Append(memberNames.Count);
                 foreach (var memberName in memberNames)
                 {
@@ -156,25 +217,25 @@ namespace DataCompression.Json
             return memberNames;
         }
 
-        private void appendValuesToResult(dynamic json, List<string> patternMemberNames, StringBuilder resultString)
+        private void appendValuesToResult(IEnumerable<JToken> json, List<string> patternMemberNames, StringBuilder resultString)
         {
             foreach (var item in json)
             {
-                if (item is DynamicJsonObject)
+                if (item is JObject)
                 {
-                    var memberNames = (item as DynamicJsonObject).GetDynamicMemberNames().ToList();
+                    var memberNames = item.Children().ToList().Select(x => ((JProperty)x).Name).ToList();
                     foreach (var memberName in patternMemberNames)
                     {
                         resultString.Append(",");
                         if (memberNames.Count == patternMemberNames.Count() && memberNames.Contains(memberName))
                         {
-                            var member = item[memberName];
-                            if (member is DynamicJsonObject)
-                                resultString.Append(compressDynamicJsonObject(member));
-                            else if (member is DynamicJsonArray)
-                                resultString.Append(compressInnerDynamicJsonArray(member));
+                            var value = ((JObject)item).GetValue(memberName);
+                            if (value is JObject)
+                                resultString.Append(compressDynamicJsonObject(value));
+                            else if (value is JArray)
+                                resultString.Append(compressInnerDynamicJsonArray(value));
                             else
-                                resultString.Append(compressNonDynamicObject(member));
+                                resultString.Append(compressNonDynamicObject((JValue)value));
                         }
                         else
                             throw new ArgumentException("JSON object doesn't have required pattern.");
@@ -185,9 +246,9 @@ namespace DataCompression.Json
             }
         }
 
-        private string compressDynamicJsonObject(dynamic jsonObject)
+        private string compressDynamicJsonObject(JToken jsonObject)
         {
-            var memberNames = jsonObject.GetDynamicMemberNames();
+            var memberNames = jsonObject.Children().ToList().Select(x => ((JProperty)x).Name).ToList();
             var resultString = new StringBuilder("{");
             foreach (var memberName in memberNames)
             {
@@ -215,38 +276,33 @@ namespace DataCompression.Json
             return resultString.ToString();
         }
 
-        private string compressMember(dynamic member)
+        private string compressMember(JToken value)
         {
             string stringifiedMember;
-            if (member is DynamicJsonObject)
-                stringifiedMember = compressDynamicJsonObject(member);
-            else if (member is DynamicJsonArray)
-                stringifiedMember = compressInnerDynamicJsonArray(member);
+            if (value.Type == JTokenType.Object)
+                stringifiedMember = compressDynamicJsonObject(value);
+            else if (value.Type == JTokenType.Array)
+                stringifiedMember = compressInnerDynamicJsonArray(value);
             else
-                stringifiedMember = compressNonDynamicObject(member);
+                stringifiedMember = compressNonDynamicObject(value);
             return stringifiedMember;
         }
 
-        private string decompressDynamicJsonArray(dynamic jsonH)
+        private string decompressDynamicJsonArray(JArray jsonH)
         {
-            if (jsonH is DynamicJsonArray)
+            var result = new StringBuilder();
+            if (jsonH.Count > 0)
             {
-                var result = new StringBuilder();
-                var jsonHArray = jsonH as DynamicJsonArray;
-                if (jsonHArray.Length > 0)
-                {
-                    result.Append(decompressArray(jsonHArray));
-                }
-                return result.ToString();
+                result.Append(decompressArray(jsonH));
             }
-            throw new ArgumentException("JSONH is not array.");
+            return result.ToString();
         }
 
-        private StringBuilder decompressArray(DynamicJsonArray jsonHArray)
+        private StringBuilder decompressArray(JArray jsonHArray)
         {
             var result = new StringBuilder();
             int membersCount = getMembersCount(jsonHArray);
-            if (jsonHArray.Length > membersCount + 1 || membersCount == 0)
+            if (jsonHArray.Count > membersCount + 1 || membersCount == 0)
             {
                 var memberNames = getMemberNames(jsonHArray, membersCount);
                 result.Append(decompressObjects(jsonHArray, membersCount, memberNames));
@@ -254,7 +310,7 @@ namespace DataCompression.Json
             return result;
         }
 
-        private StringBuilder decompressObjects(DynamicJsonArray jsonHArray, int membersCount, List<string> memberNames)
+        private StringBuilder decompressObjects(JArray jsonHArray, int membersCount, List<string> memberNames)
         {
             var result = new StringBuilder();
             if (dataContainOnlyEmptyObject(membersCount))
@@ -273,20 +329,21 @@ namespace DataCompression.Json
             return membersCount == 0;
         }
 
-        private static bool serializedDataIsConsistent(DynamicJsonArray jsonHArray, int membersCount)
+        private static bool serializedDataIsConsistent(JArray jsonHArray, int membersCount)
         {
-            return (jsonHArray.Length - membersCount - 1) % membersCount == 0;
+            return (jsonHArray.Count - membersCount - 1) % membersCount == 0;
         }
 
-        private static dynamic getMembersCount(DynamicJsonArray jsonHArray)
+        private static int getMembersCount(JArray jsonHArray)
         {
-            return jsonHArray[0];
+            var firstItem = jsonHArray.FirstOrDefault();
+            return firstItem == null ? 0 : firstItem.Value<int>();
         }
 
-        private StringBuilder decompressNotEmptyObjects(DynamicJsonArray jsonHArray, int membersCount, List<string> memberNames)
+        private StringBuilder decompressNotEmptyObjects(JArray jsonHArray, int membersCount, List<string> memberNames)
         {
             var result = new StringBuilder();
-            for (int i = membersCount + 1; i < jsonHArray.Length; i += membersCount)
+            for (int i = membersCount + 1; i < jsonHArray.Count; i += membersCount)
             {
                 result.Append("{");
                 for (int j = 0; j < membersCount; j++)
@@ -300,7 +357,7 @@ namespace DataCompression.Json
             return result;
         }
 
-        private static List<string> getMemberNames(DynamicJsonArray jsonHArray, int membersCount)
+        private static List<string> getMemberNames(JArray jsonHArray, int membersCount)
         {
             var memberNames = new List<string>();
             for (int i = 0; i < membersCount; i++)
@@ -308,40 +365,40 @@ namespace DataCompression.Json
             return memberNames;
         }
 
-        private string compressNonDynamicObject(dynamic member)
+        private string compressNonDynamicObject(JToken value)
         {
             string result;
-            if (member is string)
-                result = String.Format(@"""{0}""", member);
-            else if (member is bool)
-                result = member.ToString().ToLower();
-            else if (member == null)
+            if (value.Type == JTokenType.String)
+                result = String.Format(@"""{0}""", value);
+            else if (value.Type == JTokenType.Boolean)
+                result = value.ToString().ToLower();
+            else if (value.Type == JTokenType.Null)
                 result = "null";
             else
-                result = member.ToString();
+                result = value.ToString();
             return result;
         }
 
-        private string decompressMember(string memberName, dynamic memberValue)
+        private string decompressMember(string memberName, JToken memberValue)
         {
             return String.Format(@"""{0}"":{1},", memberName, decompressMemberValue(memberValue));
         }
 
-        private string decompressMemberValue(dynamic memberValue)
+        private string decompressMemberValue(JToken memberValue)
         {
             string stringifiedMember;
-            if (memberValue is DynamicJsonObject)
+            if (memberValue.Type == JTokenType.Object)
                 stringifiedMember = decompressDynamicJsonObject(memberValue);
-            else if (memberValue is DynamicJsonArray)
+            else if (memberValue.Type == JTokenType.Array)
                 stringifiedMember = decompressInnerDynamicJsonArray(memberValue);
             else
                 stringifiedMember = decompressNonDynamicObject(memberValue);
             return stringifiedMember;
         }
 
-        private string decompressDynamicJsonObject(dynamic jsonObject)
+        private string decompressDynamicJsonObject(JToken jsonObject)
         {
-            var memberNames = jsonObject.GetDynamicMemberNames();
+            var memberNames = jsonObject.Children().ToList().Select(x => ((JProperty)x).Name).ToList();
             var resultString = new StringBuilder("{");
             foreach (var memberName in memberNames)
             {
@@ -369,14 +426,14 @@ namespace DataCompression.Json
             return resultString.ToString();
         }
 
-        private string decompressNonDynamicObject(object memberValue)
+        private string decompressNonDynamicObject(JToken memberValue)
         {
             string result;
-            if (memberValue is string)
+            if (memberValue.Type == JTokenType.String)
                 result = String.Format(@"""{0}""", memberValue);
-            else if (memberValue is bool)
+            else if (memberValue.Type == JTokenType.Boolean)
                 result = memberValue.ToString().ToLower();
-            else if (memberValue == null)
+            else if (memberValue.Type == JTokenType.Null)
                 result = "null";
             else
                 result = memberValue.ToString();
