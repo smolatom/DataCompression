@@ -193,11 +193,23 @@ namespace DataCompression.Huffman
             return huffmanEncodedInput.ToArray();
         }
 
+        /// <summary>
+        /// Decodes input using Huffman coding (Vitter's version).
+        /// </summary>
+        /// <param name="encodedInput"></param>
+        /// <returns>String cointaining decoded characters.</returns>
         public string Decompress(IEnumerable<bool> encodedInput)
         {
             var tree = new VitterTree();
             tree.CharRead += tree_CharRead;
-            encodedInput.ToList().ForEach(tree.PushBit);
+            try
+            {
+                encodedInput.ToList().ForEach(tree.PushBit);
+            }
+            catch (Exception e)
+            {
+                return e.Message;
+            } 
             return decompressedText.ToString();
         }
 

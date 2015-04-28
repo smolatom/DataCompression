@@ -33,7 +33,7 @@ namespace DataCompression.Huffman
         private Node NYT;
         private Node pointer;
         private bool firstOccurenceOfCharIsPushed;
-        private List<bool> charBuffer;
+        private readonly List<bool> charBuffer;
 
         protected internal bool[] AddChar(byte asciiCode)
         {
@@ -81,34 +81,22 @@ namespace DataCompression.Huffman
         private void processBit(bool bit)
         {
             if (bit && pointer.RightChild != null)
-            {
-                pointer = pointer.RightChild;
-                if (pointer.IsCharacterLeaf)
-                {
-                    OnCharRead(Encoding.ASCII.GetString(new[] { pointer.Value }));
-                    AddChar(pointer.Value);
-                    pointer = Root;
-                }
-                if (pointer.IsNYT)
-                {
-                    pointer = Root;
-                    firstOccurenceOfCharIsPushed = true;
-                }
-            }
-            if (!bit && pointer.LeftChild != null)
-            {
+                pointer = pointer.RightChild;            
+            else if (!bit && pointer.LeftChild != null)
                 pointer = pointer.LeftChild;
-                if (pointer.IsCharacterLeaf)
-                {
-                    OnCharRead(Encoding.ASCII.GetString(new[] { pointer.Value }));
-                    AddChar(pointer.Value);
-                    pointer = Root;
-                }
-                if (pointer.IsNYT)
-                {
-                    pointer = Root;
-                    firstOccurenceOfCharIsPushed = true;
-                }
+            else
+                throw new ArgumentException("Processing of a code was not successful!");
+
+            if (pointer.IsCharacterLeaf)
+            {
+                OnCharRead(Encoding.ASCII.GetString(new[] { pointer.Value }));
+                AddChar(pointer.Value);
+                pointer = Root;
+            }
+            if (pointer.IsNYT)
+            {
+                pointer = Root;
+                firstOccurenceOfCharIsPushed = true;
             }
         }
 
