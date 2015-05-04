@@ -46,13 +46,13 @@ namespace DataCompression.Json
             @"[3,""a"",""b"",""c"",{""jahoda"":13,""kiwi"":{""a"":13,""b"":""hide"",""c"":false}},""hi"",true]")]
         public void CompressionOutputEqualsToJsonH(string jsonString, string jsonHString)
         {
-            const string jsonFile = @"C:\Users\speedy\Documents\TestFiles\CompressionTest.js";
+            const string jsonFile = @"C:\Users\speedy\Documents\TestFiles\UnitTests\CompressionTest.js";
             using (var writer = new StreamWriter(jsonFile))
             {
                 writer.Write(jsonString);
             }
             Compress(jsonFile);
-            const string jsonHFile = @"C:\Users\speedy\Documents\TestFiles\CompressionTest-jsonh.js";
+            const string jsonHFile = @"C:\Users\speedy\Documents\TestFiles\UnitTests\CompressionTest-jsonh.js";
             using (var reader = new StreamReader(jsonHFile))
             {
                 var jsonh = reader.ReadToEnd();
@@ -76,13 +76,13 @@ namespace DataCompression.Json
             @"[{""a"":{""jahoda"":13,""kiwi"":{""a"":13,""b"":""hide"",""c"":false}},""b"":""hi"",""c"":true}]")]
         public void DecompressionOutputEqualsToJson(string jsonH, string json)
         {
-            const string jsonHFile = @"C:\Users\speedy\Documents\TestFiles\DecompressionTest-jsonh.js";
+            const string jsonHFile = @"C:\Users\speedy\Documents\TestFiles\UnitTests\DecompressionTest-jsonh.js";
             using (var writer = new StreamWriter(jsonHFile))
             {
                 writer.Write(jsonH);
             }
             Decompress(jsonHFile);
-            const string jsonFile = @"C:\Users\speedy\Documents\TestFiles\DecompressionTest.js";
+            const string jsonFile = @"C:\Users\speedy\Documents\TestFiles\UnitTests\DecompressionTest.js";
             using (var reader = new StreamReader(jsonFile))
             {
                 var decompressedJson = reader.ReadToEnd();
@@ -98,7 +98,7 @@ namespace DataCompression.Json
         /// <returns>Data compressed as JSONH string.</returns>
         public void Compress(string path)
         {
-            if (File.Exists(path) && Path.GetExtension(path) == ".js")
+            if (System.IO.File.Exists(path) && Path.GetExtension(path).ToLower() == ".js")
             {
                 var resultString = new StringBuilder("[");
                 compressFile(path, resultString);
@@ -116,7 +116,7 @@ namespace DataCompression.Json
         /// <returns>Data decompressed as JSON string.</returns>
         public void Decompress(string path)
         {
-            if (File.Exists(path) && Path.GetExtension(path) == ".js")
+            if (System.IO.File.Exists(path) && Path.GetExtension(path).ToLower() == ".js")
             {
                 var resultString = new StringBuilder("[");
                 decompressFile(path, resultString);
