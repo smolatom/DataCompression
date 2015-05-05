@@ -3,64 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using NUnit.Framework;
 
 namespace DataCompression.File
 {
-    [TestFixture]
     public class CompressedFileReader
     {
-        [TestCase(new byte[] { 0, 48, 49, 126, 242, 17, 186, 255 }, new bool[]
-        {
-            false, false, true, true, false, false, false, true,
-            false, true, true, true, true, true, true, false,
-            true, true, true, true, false, false, true, false,
-            false, false, false, true, false, false, false, true,
-            true, false, true, true, true, false, true, false,
-            true, true, true, true, true, true, true, true
-        })]
-        [TestCase(new byte[] { 0, 144, 49, 126, 242, 17, 186, 255, 49, 126, 242, 17, 186, 255, 57, 94, 240, 145, 58, 0 }, new bool[]
-        {
-            false, false, true, true, false, false, false, true,
-            false, true, true, true, true, true, true, false,
-            true, true, true, true, false, false, true, false,
-            false, false, false, true, false, false, false, true,
-            true, false, true, true, true, false, true, false,
-            true, true, true, true, true, true, true, true,
-            false, false, true, true, false, false, false, true,
-            false, true, true, true, true, true, true, false,
-            true, true, true, true, false, false, true, false,
-            false, false, false, true, false, false, false, true,
-            true, false, true, true, true, false, true, false,
-            true, true, true, true, true, true, true, true,
-            false, false, true, true, true, false, false, true,
-            false, true, false, true, true, true, true, false,
-            true, true, true, true, false, false, false, false,
-            true, false, false, true, false, false, false, true,
-            false, false, true, true, true, false, true, false,
-            false, false, false, false, false, false, false, false
-        })]
-        public void CheckReadBytes(byte[] input, bool[] expectedBits)
-        {
-            var path = @"C:\Users\speedy\Documents\TestFiles\UnitTests\FileReader.lz";
-            using (var testWriter = new BinaryWriter(System.IO.File.Open(path, FileMode.Create)))
-            {
-                foreach (var byteValue in input)
-                {
-                    testWriter.Write(byteValue);
-                }
-                testWriter.Close();
-                testWriter.Dispose();
-            }
-
-            var testReader = new CompressedFileReader(path);
-            var bits = testReader.ReadBlock();
-            testReader.Close();
-            CollectionAssert.AreEqual(expectedBits.ToList(), bits);
-        }
-
         public bool CanReadBlock
         {
             get { return reader.BaseStream.Position < reader.BaseStream.Length - 3; }

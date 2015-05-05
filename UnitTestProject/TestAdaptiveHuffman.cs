@@ -1,28 +1,18 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Text;
+using System.Threading.Tasks;
+using DataCompression.Huffman;
 using NUnit.Framework;
-using NUnit.Framework.Constraints;
 
-namespace DataCompression.Huffman
+namespace UnitTestProject
 {
-    /// <summary>
-    /// AdaptiveHuffmanCompressor implements Huffman's coding (Vitter variant).
-    /// </summary>
     [TestFixture]
-    public class AdaptiveHuffmanCompressor
+    class TestAdaptiveHuffman
     {
-        [SetUp]
-        public void Init()
-        {
-            decompressedText = new StringBuilder();
-        }
-
         [TestCase("A", new[] { true, false, false, false, false, false, true })]
         [TestCase("B", new[] { true, false, false, false, false, true, false })]
         [TestCase("AB", new[]
@@ -134,7 +124,8 @@ namespace DataCompression.Huffman
             {
                 writer.Write(input);
             }
-            Compress(file);
+            var compressor = new AdaptiveHuffman();
+            compressor.Compress(file);
             const string compressedFile = @"C:\Users\speedy\Documents\TestFiles\UnitTests\HuffmanCompressionTest.js.huff";
             var bitsFromFile = getBits(compressedFile);
 
@@ -154,9 +145,11 @@ namespace DataCompression.Huffman
             {
                 writer.Write(input);
             }
-            Compress(file);
+            var compressor = new AdaptiveHuffman();
+            compressor.Compress(file);
             const string compressedFile = @"C:\Users\speedy\Documents\TestFiles\UnitTests\HuffmanComplexTest.js.huff";
-            Decompress(compressedFile);
+            var decompressor = new AdaptiveHuffman();
+            decompressor.Decompress(compressedFile);
             string decompressedData;
             using (var reader = new StreamReader(file))
             {
@@ -219,122 +212,17 @@ namespace DataCompression.Huffman
                     }
                 }
             }
-            Decompress(compressedFile);
+            var decompressor = new AdaptiveHuffman();
+            decompressor.Decompress(compressedFile);
             var data = string.Empty;
             using (var reader = new StreamReader(compressedFile.Replace(".huff", String.Empty)))
             {
                 data = reader.ReadToEnd();
             }
-            
+
             StringAssert.AreEqualIgnoringCase(output, data, data);
         }
 
-        private StringBuilder decompressedText;
-
-        public AdaptiveHuffmanCompressor()
-        {
-            decompressedText = new StringBuilder();
-        }
-
-        /// <summary>
-        /// Encodes input using Huffman coding (Vitter's version) and produces it as a file.
-        /// </summary>
-        /// <param name="path">File to be compressed</param>
-        public void Compress(string path)
-        {
-            var extension = Path.GetExtension(path).ToLower();
-            if (System.IO.File.Exists(path) && (extension == ".js" || extension == ".xml"))
-            {
-                var bits = new bool[0];
-                using (var reader = new StreamReader(path))
-                {
-                    var data = reader.ReadToEnd();
-                    try
-                    {
-                        bits = compress(data);
-                    }
-                    catch (Exception e) { }
-                }
-
-                var length = bits.Length;
-                var bitsToBeWritten = new List<bool>();
-                if (length > 0)
-                {
-                    var modulo = 8 - length % 8;
-                    var bitsLeft = (byte)(modulo < 3 ? 8 + modulo - 3 : modulo - 3);
-                    var moduloBits = convertByteToBits(bitsLeft);
-                    for (int i = 5; i < 8; i++)
-                    {
-                        bitsToBeWritten.Add(moduloBits[i]);
-                    }
-                    for (int i = 0; i < bitsLeft; i++)
-                    {
-                        bitsToBeWritten.Add(false);
-                    }
-                    bitsToBeWritten.AddRange(bits);
-                }
-                using (var writter = new BinaryWriter(System.IO.File.Create(String.Format("{0}.huff", path))))
-                {
-                    var buffer = new List<bool>();
-                    foreach (var bit in bitsToBeWritten)
-                    {
-                        if (buffer.Count < 8)
-                            buffer.Add(bit);
-                        if (buffer.Count == 8)
-                        {
-                            var value = getByte(buffer);
-                            buffer.Clear();
-                            writter.Write(value);
-                        }
-                    }
-                }
-            }
-        }
-
-        private static List<bool> convertByteToBits(byte index)
-        {
-            var bits = new BitArray(new int[] { index });
-            var intArray = new bool[32];
-            bits.CopyTo(intArray, 0);
-            var a = intArray.Take(8).Reverse().ToList();
-            return a;
-        }
-
-        private byte getByte(List<bool> bits)
-        {
-            bits.Reverse();
-            byte value = 0;
-            for (int i = 0; i < 8; i++)
-            {
-                value += (byte)(bits[i] ? Math.Pow(2, i) : 0);
-            }
-            return value;
-        }
-
-        /// <summary>
-        /// Decodes input using Huffman coding (Vitter's version) and produces it as a file.
-        /// </summary>
-        /// <param name="path">File to be decompressed</param>
-        public void Decompress(string path)
-        {
-            bool[] bitsFromFile = getBits(path);
-
-            var tree = new VitterTree();
-            tree.CharRead += tree_CharRead;
-            try
-            {
-                bitsFromFile.ToList().ForEach(tree.PushBit);
-            }
-            catch (Exception e)
-            {
-                decompressedText.Clear();
-                decompressedText.Append(e.Message);
-            }
-            using (var writer = new StreamWriter(path.Replace(".huff", String.Empty)))
-            {
-                writer.Write(decompressedText.ToString());
-            }
-        }
 
         private static bool[] getBits(string path)
         {
@@ -354,14 +242,6 @@ namespace DataCompression.Huffman
             return bitsFromFile;
         }
 
-        private static void addBitsToArray(byte readByte, bool[] bitsFromFile, ref int index)
-        {
-            for (int i = 0; i < 8; i++)
-            {
-                bitsFromFile[index++] = (readByte & (1 << (7 - i))) > 0;
-            }           
-        }
-
         private static bool[] getFirstPartOfData(BinaryReader reader)
         {
             var firstByte = reader.ReadByte();
@@ -377,7 +257,7 @@ namespace DataCompression.Huffman
                 }
                 return data;
             }
-            else 
+            else
             {
                 offset = offset + 3 - 8;
                 var secondByte = reader.ReadByte();
@@ -400,18 +280,32 @@ namespace DataCompression.Huffman
             return offset;
         }
 
-        private bool[] compress(string input)
+        private static void addBitsToArray(byte readByte, bool[] bitsFromFile, ref int index)
         {
-            var tree = new VitterTree();
-            var asciiEncodedInput = Encoding.ASCII.GetBytes(input);
-            var huffmanEncodedChars = asciiEncodedInput.Select(tree.AddChar).ToList();
-            var huffmanEncodedInput = new List<bool>();
-            huffmanEncodedChars.ForEach(x => x.ToList().ForEach(huffmanEncodedInput.Add));
-            return huffmanEncodedInput.ToArray();
+            for (int i = 0; i < 8; i++)
+            {
+                bitsFromFile[index++] = (readByte & (1 << (7 - i))) > 0;
+            }
         }
-        private void tree_CharRead(object sender, CharReadEventArgs e)
+
+        private static List<bool> convertByteToBits(byte index)
         {
-            decompressedText.Append(e.Character);
+            var bits = new BitArray(new int[] { index });
+            var intArray = new bool[32];
+            bits.CopyTo(intArray, 0);
+            var a = intArray.Take(8).Reverse().ToList();
+            return a;
+        }
+
+        private byte getByte(List<bool> bits)
+        {
+            bits.Reverse();
+            byte value = 0;
+            for (int i = 0; i < 8; i++)
+            {
+                value += (byte)(bits[i] ? Math.Pow(2, i) : 0);
+            }
+            return value;
         }
     }
 }

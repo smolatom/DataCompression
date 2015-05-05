@@ -50,11 +50,11 @@
   <ItemGroup>
     <Compile Include="File\CompressedFileWriter.cs" />
     <Compile Include="File\CompressedFileReader.cs" />
-    <Compile Include="Huffman\AdaptiveHuffmanCompressor.cs" />
+    <Compile Include="Huffman\AdaptiveHuffman.cs" />
     <Compile Include="Huffman\Node.cs" />
     <Compile Include="Huffman\VitterTree.cs" />
-    <Compile Include="Json\JsonHCompressor.cs" />
-    <Compile Include="LZ\LZ77Compressor.cs" />
+    <Compile Include="Json\JsonH.cs" />
+    <Compile Include="LZ\LZ77.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

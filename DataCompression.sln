@@ -10,6 +10,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{DE9CB7
 		.nuget\packages.config = .nuget\packages.config
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTestProject", "UnitTestProject\UnitTestProject.csproj", "{5645C54E-1134-4737-ADB2-E1EEF88929F2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,6 +22,10 @@ Global
 		{2D731BF0-B732-4670-8981-FEE18F22C290}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2D731BF0-B732-4670-8981-FEE18F22C290}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2D731BF0-B732-4670-8981-FEE18F22C290}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5645C54E-1134-4737-ADB2-E1EEF88929F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5645C54E-1134-4737-ADB2-E1EEF88929F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5645C54E-1134-4737-ADB2-E1EEF88929F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5645C54E-1134-4737-ADB2-E1EEF88929F2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
